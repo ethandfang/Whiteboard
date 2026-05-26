@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Process Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#f9f8f6;
+  --surface:#ffffff;
+  --border:#e8e5e0;
+  --text:#1a1917;
+  --muted:#8a8680;
+  --accent:#2a2a2a;
+  --mic-active:#e85d4a;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+}
+
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  padding:24px 20px 32px;
+  color:var(--text);
+}
+
+header{
+  width:100%;
+  max-width:960px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:20px;
+}
+
+.logo{display:flex;align-items:center;gap:10px;}
+
+.logo-mark{
+  width:32px;height:32px;
+  border-radius:8px;
+  background:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+}
+
+.logo-mark svg{stroke:#fff;width:16px;height:16px;}
+.logo-text{font-size:15px;font-weight:600;letter-spacing:-.3px;}
+.logo-sub{font-size:12px;color:var(--muted);margin-top:1px;}
+
+.status-pill{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 12px;
+  border-radius:20px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  font-size:12px;
+  color:var(--muted);
+  font-family:'DM Mono',monospace;
+}
+
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);transition:background .3s;}
+.status-dot.ready{background:#4caf7d;}
+.status-dot.thinking{background:#f5a623;animation:blink .8s infinite;}
+.status-dot.error{background:#e85d4a;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+#canvas-wrap{
+  width:100%;max-width:960px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:var(--shadow);
+  position:relative;
+  min-height:480px;
+  flex:1;
+}
+
+#main-canvas{width:100%;height:100%;min-height:480px;display:block;}
+#main-canvas{touch-action:none;cursor:grab;}
+#main-canvas.dragging{cursor:grabbing;}
+
+#empty-state{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:12px;
+  pointer-events:none;
+  transition:opacity .4s;
+}
+
+.empty-icon{
+  width:48px;height:48px;
+  border-radius:12px;
+  border:1.5px dashed var(--border);
+  display:flex;align-items:center;justify-content:center;
+}
+
+.empty-icon svg{stroke:var(--border);width:22px;height:22px;}
+#empty-state h2{font-size:15px;font-weight:500;color:var(--muted);letter-spacing:-.2px;}
+#empty-state p{font-size:12px;color:var(--border);font-family:'DM Mono',monospace;text-align:center;line-height:1.6;}
+
+#controls{width:100%;max-width:960px;margin-top:16px;display:flex;flex-direction:column;gap:10px;}
+
+#input-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:6px 6px 6px 16px;
+  box-shadow:var(--shadow);
+  transition:border-color .2s;
+}
+
+#input-row:focus-within{border-color:#b0aca5;}
+
+#cmd-input{
+  flex:1;
+  border:none;outline:none;
+  background:transparent;
+  font-size:14px;
+  font-family:'DM Sans',sans-serif;
+  color:var(--text);
+  min-height:36px;
+}
+
+#cmd-input::placeholder{color:#c5c0b8;}
+
+#mic-btn{
+  width:40px;height:40px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:var(--bg);
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  transition:all .2s;
+}
+
+#mic-btn:hover{background:var(--border);}
+#mic-btn.active{background:var(--mic-active);border-color:var(--mic-active);animation:mic-pulse 1.4s infinite;}
+#mic-btn svg{width:16px;height:16px;stroke:var(--muted);transition:stroke .2s;}
+#mic-btn.active svg{stroke:#fff;}
+@keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(232,93,74,.4);}50%{box-shadow:0 0 0 8px rgba(232,93,74,0);}}
+
+#run-btn{
+  height:40px;padding:0 18px;
+  border-radius:10px;
+  border:none;
+  background:var(--accent);
+  color:#fff;
+  font-size:13px;font-weight:500;
+  font-family:'DM Sans',sans-serif;
+  cursor:pointer;
+  flex-shrink:0;
+  transition:opacity .2s,transform .1s;
+}
+
+#run-btn:hover{opacity:.85;}
+#run-btn:active{transform:scale(.97);}
+#run-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+#undo-btn{
+  height:40px;padding:0 12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--text);
+  font-size:12px;font-weight:500;
+  font-family:'DM Mono',monospace;
+  cursor:pointer;
+  flex-shrink:0;
+  transition:all .15s;
+}
+
+#undo-btn:hover{background:var(--border);}
+#undo-btn:disabled{opacity:.45;cursor:not-allowed;}
+
+#export-btn{
+  height:40px;padding:0 14px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:var(--bg);
+  color:var(--text);
+  font-size:12px;font-weight:500;
+  font-family:'DM Mono',monospace;
+  cursor:pointer;
+  flex-shrink:0;
+  transition:all .15s;
+}
+
+#export-btn:hover{background:var(--border);}
+#export-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+#hint-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+.hint-chip{
+  padding:5px 12px;
+  border-radius:20px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  font-size:11px;
+  font-family:'DM Mono',monospace;
+  color:var(--muted);
+  cursor:pointer;
+  transition:all .15s;
+  white-space:nowrap;
+}
+
+.hint-chip:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+#thinking{
+  position:absolute;
+  top:16px;right:16px;
+  display:none;
+  align-items:center;
+  gap:6px;
+  padding:6px 12px;
+  border-radius:20px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  font-size:11px;
+  font-family:'DM Mono',monospace;
+  color:var(--muted);
+  box-shadow:var(--shadow);
+}
+
+#thinking.show{display:flex;}
+
+.think-dots span{
+  display:inline-block;
+  width:4px;height:4px;
+  border-radius:50%;
+  background:var(--muted);
+  margin:0 1px;
+  animation:bounce .9s infinite;
+}
+
+.think-dots span:nth-child(2){animation-delay:.15s;}
+.think-dots span:nth-child(3){animation-delay:.3s;}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}
+
+@media (max-width: 760px) {
+  body{padding:16px 12px 20px;}
+  .logo-sub{display:none;}
+  #cmd-input{font-size:13px;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-12m0 4.5h12"/></svg>
+    </div>
+    <div>
+      <div class="logo-text">Process Visualizer</div>
+      <div class="logo-sub">Voice and text to process diagrams with Groq</div>
+    </div>
+  </div>
+  <div class="status-pill">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-label">booting</span>
+  </div>
+</header>
+
+<div id="canvas-wrap">
+  <canvas id="main-canvas"></canvas>
+
+  <div id="empty-state">
+    <div class="empty-icon">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+    </div>
+    <h2>Describe what to draw</h2>
+    <p>Try: "5-step hiring flow with arrows"<br />or "legend with 4 color items" or "clear"</p>
+  </div>
+
+  <div id="thinking">
+    <div class="think-dots"><span></span><span></span><span></span></div>
+    thinking
+  </div>
+</div>
+
+<div id="controls">
+  <div id="input-row">
+    <button id="mic-btn" title="Click to speak">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/></svg>
+    </button>
+    <input id="cmd-input" type="text" placeholder="Describe a process, shape, arrow, legend, color change..." />
+    <button id="undo-btn" disabled>Undo</button>
+    <button id="export-btn">Export PNG</button>
+    <button id="run-btn">Draw</button>
+  </div>
+  <div id="hint-row">
+    <div class="hint-chip" onclick="run('5-step hiring process with arrows')">hiring flow</div>
+    <div class="hint-chip" onclick="run('checkout flow: Cart to Payment to Confirm')">checkout flow</div>
+    <div class="hint-chip" onclick="run('color legend: green=approved, red=rejected, yellow=pending, blue=review')">color legend</div>
+    <div class="hint-chip" onclick="run('draw a circle in the center, teal')">circle</div>
+    <div class="hint-chip" onclick="run('clear the canvas')">clear</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('main-canvas');
+const ctx = canvas.getContext('2d');
+
+let isListening = false;
+let recognition = null;
+let mediaRecorder = null;
+let mediaStream = null;
+let recordingChunks = [];
+let elements = [];
+let serverReady = false;
+let voiceMode = 'none';
+let dragState = null;
+const historyStack = [];
+const MAX_HISTORY = 30;
+
+function setStatus(label, state) {
+  document.getElementById('status-label').textContent = label;
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot ' + (state || '');
+}
+
+function snapshotElements() {
+  return JSON.parse(JSON.stringify(elements));
+}
+
+function pushHistorySnapshot(snapshot) {
+  historyStack.push(snapshot);
+  if (historyStack.length > MAX_HISTORY) {
+    historyStack.shift();
+  }
+  updateUndoButton();
+}
+
+function updateUndoButton() {
+  undoBtn.disabled = historyStack.length === 0;
+}
+
+function undoLastChange() {
+  if (historyStack.length === 0) return;
+  elements = historyStack.pop() || [];
+  redraw();
+  updateUndoButton();
+  setStatus('undid change', 'ready');
+}
+
+function resizeCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  const dpr = window.devicePixelRatio || 1;
+  const w = wrap.clientWidth;
+  const h = Math.max(480, wrap.clientHeight);
+
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+
+  // Prevent transform scaling from stacking on repeated resizes.
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+
+  redraw();
+}
+
+window.addEventListener('resize', resizeCanvas);
+
+const COLORS = {
+  purple:'#7c6fcd', blue:'#4a90d9', teal:'#3aab8c', green:'#5cb85c',
+  red:'#e85d4a', coral:'#e07b54', orange:'#f5a623', amber:'#f0b429',
+  yellow:'#f5d020', pink:'#d96fa3', gray:'#9b9590', dark:'#2a2a2a',
+  white:'#ffffff', black:'#1a1917', navy:'#1e3a5f', indigo:'#4b5fad',
+  mint:'#52c7a0', rose:'#e8738a', lavender:'#a89de0', cyan:'#45b8d8',
+  brown:'#8b6347', lime:'#8bc34a'
+};
+
+function resolveColor(name, fallback) {
+  if (!name) return fallback || '#4a90d9';
+  if (name.startsWith('#')) return name;
+  return COLORS[name.toLowerCase()] || fallback || '#4a90d9';
+}
+
+function W() { return canvas.width / (window.devicePixelRatio || 1); }
+function H() { return canvas.height / (window.devicePixelRatio || 1); }
+
+function redraw() {
+  ctx.clearRect(0, 0, W(), H());
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W(), H());
+
+  if (elements.length === 0) {
+    document.getElementById('empty-state').style.opacity = '1';
+    return;
+  }
+
+  document.getElementById('empty-state').style.opacity = '0';
+
+  elements.filter((e) => e.type === 'arrow').forEach(drawArrow);
+
+  elements.filter((e) => e.type !== 'arrow').forEach((el) => {
+    switch(el.type) {
+      case 'rect': drawRect(el); break;
+      case 'circle': drawCircle(el); break;
+      case 'diamond': drawDiamond(el); break;
+      case 'legend': drawLegend(el); break;
+      case 'flow': drawFlow(el); break;
+      case 'text': drawTextEl(el); break;
+      default: break;
+    }
+  });
+}
+
+function drawRect(el) {
+  const {x,y,w,h,color,label,labelColor,rx=10,borderColor,shadow} = el;
+  if (shadow) {
+    ctx.shadowColor = 'rgba(0,0,0,0.12)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 3;
+  }
+  ctx.beginPath();
+  roundRect(ctx, x, y, w, h, rx);
+  ctx.fillStyle = resolveColor(color, '#4a90d9');
+  ctx.fill();
+  if (borderColor) {
+    ctx.strokeStyle = resolveColor(borderColor);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  if (label) drawCenteredText(label, x+w/2, y+h/2, resolveColor(labelColor,'#fff'), el.fontSize||14, el.fontWeight||'500');
+}
+
+function drawCircle(el) {
+  const {x,y,r,color,label,labelColor} = el;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = resolveColor(color,'#4a90d9');
+  ctx.fill();
+  if (label) drawCenteredText(label, x, y, resolveColor(labelColor,'#fff'), el.fontSize||13, '500');
+}
+
+function drawDiamond(el) {
+  const {x,y,w,h,color,label,labelColor} = el;
+  ctx.beginPath();
+  ctx.moveTo(x + w/2, y);
+  ctx.lineTo(x + w, y + h/2);
+  ctx.lineTo(x + w/2, y + h);
+  ctx.lineTo(x, y + h/2);
+  ctx.closePath();
+  ctx.fillStyle = resolveColor(color,'#f5a623');
+  ctx.fill();
+  if (label) drawCenteredText(label, x + w/2, y + h/2, resolveColor(labelColor,'#fff'), el.fontSize||12, '500');
+}
+
+function drawArrow(el) {
+  const {x1,y1,x2,y2,color,label,curved,dashed} = el;
+  const c = resolveColor(color,'#9b9590');
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 2;
+  ctx.fillStyle = c;
+
+  if (dashed) ctx.setLineDash([6,4]);
+  else ctx.setLineDash([]);
+
+  ctx.beginPath();
+  if (curved) {
+    const cx = (x1+x2)/2;
+    const cy = (y1+y2)/2 - 40;
+    ctx.moveTo(x1,y1);
+    ctx.quadraticCurveTo(cx,cy,x2,y2);
+  } else {
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const size = 9;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - size * Math.cos(angle - 0.4), y2 - size * Math.sin(angle - 0.4));
+  ctx.lineTo(x2 - size * Math.cos(angle + 0.4), y2 - size * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fill();
+
+  if (label) {
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2 - (curved ? 25 : 10);
+    ctx.font = '11px DM Sans';
+    ctx.fillStyle = '#8a8680';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, mx, my);
+  }
+}
+
+function drawLegend(el) {
+  const {x,y,items,title} = el;
+  const safeItems = Array.isArray(items) ? items : [];
+  const { itemH, pad, dotR, w, h } = getLegendMetrics(el);
+
+  if (safeItems.length === 0) return;
+
+  ctx.shadowColor = 'rgba(0,0,0,0.08)';
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 4;
+  roundRect(ctx, x, y, w, h, 12);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#e8e5e0';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+
+  let offsetY = y + pad;
+
+  if (title) {
+    ctx.font = '600 13px DM Sans';
+    ctx.fillStyle = '#1a1917';
+    ctx.textAlign = 'left';
+    ctx.fillText(title, x + pad, offsetY + 10);
+    offsetY += 28;
+    ctx.strokeStyle = '#f0ede8';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + pad, offsetY - 6);
+    ctx.lineTo(x + w - pad, offsetY - 6);
+    ctx.stroke();
+  }
+
+  safeItems.forEach((item, i) => {
+    const iy = offsetY + i * itemH + itemH / 2;
+
+    ctx.beginPath();
+    ctx.arc(x + pad + dotR, iy, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = resolveColor(item.color,'#4a90d9');
+    ctx.fill();
+
+    const label = item.label || '';
+    ctx.font = '400 13px DM Sans';
+    ctx.fillStyle = '#1a1917';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, x + pad + dotR * 2 + 10, iy + 4.5);
+
+    if (item.sublabel) {
+      ctx.font = '400 11px DM Sans';
+      ctx.fillStyle = '#8a8680';
+      ctx.fillText(item.sublabel, x + pad + dotR * 2 + 10 + measureText(label,13) + 8, iy + 4.5);
+    }
+  });
+}
+
+function drawFlow(el) {
+  const {steps, direction='horizontal', startX, startY, stepW=130, stepH=52, gap=40, palette} = el;
+  const safeSteps = Array.isArray(steps) ? steps : [];
+  const palettes = {
+    purple: ['#7c6fcd','#6b60b8','#5a50a3','#4a408e','#3a3079'],
+    blue: ['#4a90d9','#3a7ec4','#2a6caf','#1a5a9a','#0a4885'],
+    teal: ['#3aab8c','#2d9678','#208164','#136c50','#06573c'],
+    warm: ['#e07b54','#d4694a','#c85740','#bc4536','#b0332c'],
+    gray: ['#9b9590','#857f7a','#6f6964','#59534e','#433d38']
+  };
+  const pal = palettes[palette] || palettes.purple;
+
+  safeSteps.forEach((step, i) => {
+    const sx = direction === 'horizontal' ? startX + i * (stepW + gap) : startX;
+    const sy = direction === 'horizontal' ? startY : startY + i * (stepH + gap);
+
+    ctx.shadowColor = 'rgba(0,0,0,0.10)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+    ctx.beginPath();
+    const r = i === 0 ? [10,0,0,10] : i === safeSteps.length - 1 ? [0,10,10,0] : [0,0,0,0];
+    roundRectCorners(ctx, sx, sy, stepW, stepH, r);
+    ctx.fillStyle = pal[Math.min(i, pal.length - 1)];
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.font = '500 10px DM Mono';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.textAlign = 'center';
+    ctx.fillText('0' + (i + 1), sx + stepW / 2, sy + 16);
+
+    ctx.font = '500 12px DM Sans';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    const lines = wrapText(step, stepW - 20);
+    lines.forEach((line, li) => {
+      ctx.fillText(line, sx + stepW / 2, sy + stepH / 2 + 5 + (li - (lines.length - 1) / 2) * 15);
+    });
+
+    if (i < safeSteps.length - 1) {
+      const ax = direction === 'horizontal' ? sx + stepW : sx + stepW/2;
+      const ay = direction === 'horizontal' ? sy + stepH/2 : sy + stepH;
+      const bx = direction === 'horizontal' ? sx + stepW + gap : sx + stepW/2;
+      const by = direction === 'horizontal' ? sy + stepH/2 : sy + stepH + gap;
+
+      ctx.strokeStyle = pal[Math.min(i, pal.length - 1)];
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx - (direction === 'horizontal' ? 8 : 0), by - (direction === 'vertical' ? 8 : 0));
+      ctx.stroke();
+
+      const angle = direction === 'horizontal' ? 0 : Math.PI/2;
+      ctx.fillStyle = pal[Math.min(i, pal.length - 1)];
+      ctx.beginPath();
+      ctx.moveTo(bx,by);
+      ctx.lineTo(bx - 9 * Math.cos(angle - 0.4), by - 9 * Math.sin(angle - 0.4));
+      ctx.lineTo(bx - 9 * Math.cos(angle + 0.4), by - 9 * Math.sin(angle + 0.4));
+      ctx.closePath();
+      ctx.fill();
+    }
+  });
+}
+
+function drawTextEl(el) {
+  const {x,y,text,color,fontSize=16,fontWeight='400',align='left'} = el;
+  ctx.font = `${fontWeight} ${fontSize}px DM Sans`;
+  ctx.fillStyle = resolveColor(color,'#1a1917');
+  ctx.textAlign = align;
+  ctx.fillText(text, x, y);
+}
+
+function drawCenteredText(text, cx, cy, color, size, weight) {
+  ctx.font = `${weight||'400'} ${size||13}px DM Sans`;
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const lines = wrapText(text, 120);
+  lines.forEach((line, i) => {
+    ctx.fillText(line, cx, cy + (i - (lines.length - 1)/2) * ((size||13) + 3));
+  });
+  ctx.textBaseline = 'alphabetic';
+}
+
+function measureText(text, size) {
+  ctx.font = `400 ${size||13}px DM Sans`;
+  return ctx.measureText(text).width;
+}
+
+function wrapText(text, maxW) {
+  if (measureText(text,12) <= maxW) return [text];
+  const words = String(text).split(' ');
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (measureText(test,12) > maxW && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function roundRect(ctxRef, x, y, w, h, r) {
+  ctxRef.beginPath();
+  ctxRef.moveTo(x+r, y);
+  ctxRef.lineTo(x+w-r, y);
+  ctxRef.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctxRef.lineTo(x+w, y+h-r);
+  ctxRef.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctxRef.lineTo(x+r, y+h);
+  ctxRef.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctxRef.lineTo(x, y+r);
+  ctxRef.quadraticCurveTo(x, y, x+r, y);
+  ctxRef.closePath();
+}
+
+function roundRectCorners(ctxRef, x, y, w, h, r) {
+  const [tl,tr,br,bl] = r;
+  ctxRef.beginPath();
+  ctxRef.moveTo(x+tl, y);
+  ctxRef.lineTo(x+w-tr, y);
+  if (tr) ctxRef.quadraticCurveTo(x+w,y,x+w,y+tr); else ctxRef.lineTo(x+w,y);
+  ctxRef.lineTo(x+w, y+h-br);
+  if (br) ctxRef.quadraticCurveTo(x+w,y+h,x+w-br,y+h); else ctxRef.lineTo(x+w,y+h);
+  ctxRef.lineTo(x+bl, y+h);
+  if (bl) ctxRef.quadraticCurveTo(x,y+h,x,y+h-bl); else ctxRef.lineTo(x,y+h);
+  ctxRef.lineTo(x, y+tl);
+  if (tl) ctxRef.quadraticCurveTo(x,y,x+tl,y); else ctxRef.lineTo(x,y);
+  ctxRef.closePath();
+}
+
+function getLegendMetrics(el) {
+  const safeItems = Array.isArray(el.items) ? el.items : [];
+  const itemH = 32;
+  const pad = 16;
+  const dotR = 7;
+  const maxLabelW = safeItems.length
+    ? Math.max(...safeItems.map((i) => measureText(i.label || '', 13))) + 20
+    : 0;
+  const w = dotR * 2 + maxLabelW + pad * 2 + 10;
+  const h = safeItems.length * itemH + pad * 2 + (el.title ? 28 : 0);
+  return { itemH, pad, dotR, w, h };
+}
+
+function getElementBounds(el) {
+  switch (el.type) {
+    case 'rect':
+      return { x: el.x, y: el.y, w: el.w, h: el.h };
+    case 'circle':
+      return { x: el.x - el.r, y: el.y - el.r, w: el.r * 2, h: el.r * 2 };
+    case 'diamond':
+      return { x: el.x, y: el.y, w: el.w, h: el.h };
+    case 'legend': {
+      const { w, h } = getLegendMetrics(el);
+      return { x: el.x, y: el.y, w, h };
+    }
+    case 'text': {
+      const fontSize = Number(el.fontSize || 16);
+      const width = measureText(el.text || '', fontSize);
+      const align = el.align || 'left';
+      let x = el.x;
+      if (align === 'center') x = el.x - width / 2;
+      if (align === 'right') x = el.x - width;
+      return { x, y: el.y - fontSize, w: width, h: fontSize + 8 };
+    }
+    case 'flow': {
+      const steps = Array.isArray(el.steps) ? el.steps : [];
+      const stepW = Number(el.stepW || 130);
+      const stepH = Number(el.stepH || 52);
+      const gap = Number(el.gap || 40);
+      const horizontal = (el.direction || 'horizontal') === 'horizontal';
+      const w = horizontal ? (steps.length * stepW + Math.max(0, steps.length - 1) * gap) : stepW;
+      const h = horizontal ? stepH : (steps.length * stepH + Math.max(0, steps.length - 1) * gap);
+      return { x: el.startX, y: el.startY, w, h };
+    }
+    default:
+      return null;
+  }
+}
+
+function pointInBounds(x, y, b) {
+  if (!b) return false;
+  return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
+}
+
+function moveElement(el, dx, dy) {
+  switch (el.type) {
+    case 'rect':
+    case 'diamond':
+    case 'legend':
+    case 'text':
+      el.x += dx;
+      el.y += dy;
+      break;
+    case 'circle':
+      el.x += dx;
+      el.y += dy;
+      break;
+    case 'flow':
+      el.startX += dx;
+      el.startY += dy;
+      break;
+    default:
+      break;
+  }
+}
+
+function getPointerPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+}
+
+canvas.addEventListener('pointerdown', (event) => {
+  const p = getPointerPoint(event);
+
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+    if (!el || el.type === 'arrow') continue;
+
+    const bounds = getElementBounds(el);
+    if (!pointInBounds(p.x, p.y, bounds)) continue;
+
+    dragState = {
+      index: i,
+      lastX: p.x,
+      lastY: p.y,
+      beforeElements: snapshotElements()
+    };
+    canvas.classList.add('dragging');
+    canvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    return;
+  }
+});
+
+canvas.addEventListener('pointermove', (event) => {
+  if (!dragState) return;
+
+  const p = getPointerPoint(event);
+  const dx = p.x - dragState.lastX;
+  const dy = p.y - dragState.lastY;
+
+  const el = elements[dragState.index];
+  if (!el) return;
+
+  moveElement(el, dx, dy);
+  dragState.lastX = p.x;
+  dragState.lastY = p.y;
+  redraw();
+  event.preventDefault();
+});
+
+function clearDragState(pointerId) {
+  const hadDrag = Boolean(dragState);
+  const beforeDrag = hadDrag ? dragState.beforeElements : null;
+  if (!dragState) return;
+  dragState = null;
+  canvas.classList.remove('dragging');
+  try {
+    canvas.releasePointerCapture(pointerId);
+  } catch (_err) {
+    // Ignore release issues on unsupported pointer capture states.
+  }
+
+  if (hadDrag && beforeDrag) {
+    const changed = JSON.stringify(beforeDrag) !== JSON.stringify(elements);
+    if (changed) {
+      pushHistorySnapshot(beforeDrag);
+    }
+  }
+}
+
+canvas.addEventListener('pointerup', (event) => {
+  clearDragState(event.pointerId);
+});
+
+canvas.addEventListener('pointercancel', (event) => {
+  clearDragState(event.pointerId);
+});
+
+async function run(cmd) {
+  const prompt = String(cmd || '').trim();
+  if (!prompt || !serverReady) return;
+  const previousElements = snapshotElements();
+
+  setStatus('thinking', 'thinking');
+  document.getElementById('thinking').classList.add('show');
+  document.getElementById('run-btn').disabled = true;
+
+  try {
+    const res = await fetch('/api/draw', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        currentElements: elements
+      })
+    });
+
+    const payload = await res.json();
+
+    if (!res.ok) {
+      throw new Error(payload.error || 'Request failed');
+    }
+
+    elements = Array.isArray(payload.elements) ? payload.elements : [];
+    const changed = JSON.stringify(previousElements) !== JSON.stringify(elements);
+    if (changed) {
+      pushHistorySnapshot(previousElements);
+    }
+    redraw();
+    setStatus('ready', 'ready');
+  } catch (e) {
+    setStatus('error', 'error');
+    console.error(e);
+    alert(e.message || 'Something went wrong.');
+  } finally {
+    document.getElementById('thinking').classList.remove('show');
+    document.getElementById('run-btn').disabled = false;
+  }
+}
+
+const cmdInput = document.getElementById('cmd-input');
+const runBtn = document.getElementById('run-btn');
+const micBtn = document.getElementById('mic-btn');
+const undoBtn = document.getElementById('undo-btn');
+const exportBtn = document.getElementById('export-btn');
+
+runBtn.addEventListener('click', () => {
+  const v = cmdInput.value.trim();
+  if (!v) return;
+  run(v);
+  cmdInput.value = '';
+});
+
+cmdInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') runBtn.click();
+});
+
+undoBtn.addEventListener('click', () => {
+  undoLastChange();
+});
+
+window.addEventListener('keydown', (e) => {
+  const target = e.target;
+  const isTextEditing = target && (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.isContentEditable
+  );
+  if (isTextEditing) return;
+
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    undoLastChange();
+  }
+});
+
+exportBtn.addEventListener('click', () => {
+  if (!elements.length) {
+    alert('Nothing to export yet. Draw something first.');
+    return;
+  }
+
+  const anchor = document.createElement('a');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  anchor.href = canvas.toDataURL('image/png');
+  anchor.download = `process-diagram-${stamp}.png`;
+  anchor.click();
+});
+
+function initSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR) {
+    voiceMode = 'speech';
+
+    recognition = new SR();
+    recognition.lang = 'en-US';
+    recognition.interimResults = true;
+
+    recognition.onresult = (e) => {
+      let final = '';
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) final += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      cmdInput.value = final || interim;
+      if (final) {
+        stopListening();
+        run(final);
+        cmdInput.value = '';
+      }
+    };
+
+    recognition.onerror = (e) => {
+      setStatus('mic error', 'error');
+      console.error(e);
+      stopListening();
+    };
+
+    recognition.onend = stopListening;
+    micBtn.title = 'Click to speak';
+    return;
+  }
+
+  if (navigator.mediaDevices && typeof MediaRecorder !== 'undefined') {
+    voiceMode = 'record';
+    micBtn.title = 'Click to record voice';
+    return;
+  }
+
+  voiceMode = 'none';
+  micBtn.style.opacity = '0.3';
+  micBtn.title = 'Voice not supported in this browser.';
+}
+
+async function startRecording() {
+  const mimeOptions = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+  const supportedMime = mimeOptions.find((m) => MediaRecorder.isTypeSupported(m));
+
+  mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  mediaRecorder = supportedMime
+    ? new MediaRecorder(mediaStream, { mimeType: supportedMime })
+    : new MediaRecorder(mediaStream);
+
+  recordingChunks = [];
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) recordingChunks.push(e.data);
+  };
+
+  mediaRecorder.onerror = (e) => {
+    console.error(e);
+    stopListening();
+  };
+
+  mediaRecorder.onstop = async () => {
+    try {
+      const mimeType = mediaRecorder.mimeType || 'audio/webm';
+      const blob = new Blob(recordingChunks, { type: mimeType });
+
+      if (!blob.size) {
+        throw new Error('No audio captured.');
+      }
+
+      setStatus('transcribing', 'thinking');
+      document.getElementById('run-btn').disabled = true;
+
+      const ext = mimeType.includes('mp4') ? 'm4a' : 'webm';
+      const file = new File([blob], `speech.${ext}`, { type: mimeType });
+      const form = new FormData();
+      form.append('audio', file);
+
+      const res = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: form
+      });
+
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.error || 'Transcription failed.');
+      }
+
+      const text = String(payload.text || '').trim();
+      if (!text) {
+        setStatus('no speech', 'error');
+        return;
+      }
+
+      cmdInput.value = text;
+      await run(text);
+      cmdInput.value = '';
+    } catch (e) {
+      setStatus('voice error', 'error');
+      alert(e.message || 'Voice transcription failed.');
+      console.error(e);
+    } finally {
+      document.getElementById('run-btn').disabled = false;
+      if (serverReady) setStatus('ready', 'ready');
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((t) => t.stop());
+      }
+      mediaStream = null;
+      mediaRecorder = null;
+      recordingChunks = [];
+    }
+  };
+
+  mediaRecorder.start();
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  isListening = false;
+  micBtn.classList.remove('active');
+  setStatus('processing voice', 'thinking');
+}
+
+function stopListening() {
+  isListening = false;
+  micBtn.classList.remove('active');
+  if (serverReady) setStatus('ready', 'ready');
+}
+
+micBtn.addEventListener('click', () => {
+  if (!serverReady || voiceMode === 'none') return;
+
+  if (isListening) {
+    if (voiceMode === 'speech' && recognition) {
+      recognition.stop();
+    } else if (voiceMode === 'record') {
+      stopRecording();
+    }
+    return;
+  }
+
+  isListening = true;
+  micBtn.classList.add('active');
+  cmdInput.value = '';
+  setStatus('listening', 'thinking');
+
+  try {
+    if (voiceMode === 'speech' && recognition) {
+      recognition.start();
+    } else if (voiceMode === 'record') {
+      startRecording().catch((error) => {
+        console.error(error);
+        stopListening();
+        setStatus('mic blocked', 'error');
+      });
+    }
+  } catch (_e) {
+    stopListening();
+  }
+});
+
+async function bootstrap() {
+  resizeCanvas();
+  initSpeech();
+  setStatus('connecting', 'thinking');
+
+  try {
+    const res = await fetch('/health');
+    const info = await res.json();
+
+    if (!res.ok || !info.ok) {
+      throw new Error('Server not available');
+    }
+
+    if (!info.hasApiKey) {
+      serverReady = false;
+      setStatus('missing key', 'error');
+      runBtn.disabled = true;
+      cmdInput.placeholder = 'Server needs GROQ_API_KEY in .env';
+      alert('Set GROQ_API_KEY in your server .env file, then restart the app.');
+      return;
+    }
+
+    serverReady = true;
+    runBtn.disabled = false;
+    setStatus('ready', 'ready');
+  } catch (error) {
+    serverReady = false;
+    setStatus('offline', 'error');
+    runBtn.disabled = true;
+    alert('Could not connect to server. Start the backend with npm run dev.');
+    console.error(error);
+  }
+}
+
+bootstrap();
+</script>
+</body>
+</html>
