@@ -1,4 +1,4 @@
-# Process Visualizer (Groq)
+# Process Visualizer (via Groq)
 
 A shareable web app where users speak or type prompts and get process diagrams rendered on canvas (flows, legends, arrows, shapes, labels).
 
