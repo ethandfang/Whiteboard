@@ -12,7 +12,7 @@ A shareable web app where users speak or type prompts and get process diagrams r
 - API rate limiting to control abuse
 - One-click PNG export from the canvas
 
-## Quick start
+## Quick
 
 1. Install dependencies:
 
